@@ -30,6 +30,7 @@ def open_csv(filename, chunksize=20000):
     df = pd.DataFrame()
     
     for c in pd.read_table(filename, sep=' {1,}|"', chunksize=chunksize, iterator=True, engine='python', index_col=False, header=None, parse_dates=[[0, 1, 2], [9,10]]):
+    #for c in pd.read_table(filename, sep=':{1,}|=', chunksize=chunksize, iterator=True, engine='python', index_col=False, header=None, parse_dates=[[0, 1, 2], [9,10]]):    
         df = pd.concat([df, c])
         total_chunksize += chunksize
         
