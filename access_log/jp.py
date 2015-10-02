@@ -33,7 +33,7 @@ def juniper_log_cleansing(x):
     
 def read_syslog_juniper(filename):
        
-    df = open_juniper_log(filename)
+    df = open_juniper_log(filename, 50000)
     
     df = df[df[7].str.contains('information') == False]
     
