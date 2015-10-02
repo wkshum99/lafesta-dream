@@ -57,9 +57,9 @@ def read_syslog_juniper(filename):
 
 def process_group(juniper):
     temp_result = []
-    grouped = juniper.groupby(['date', 'src_address', 'dst_address', 'service', 'action'])
-    for d, src, dst, srv, a in grouped.groups.keys():
-        temp_result.append([d, src, dst, srv, len(juniper.iloc[grouped.groups[(d, src, dst, srv, a)]]), 
-                            np.sum(juniper.iloc[grouped.groups[(d, src, dst, srv, a)]]).total_size, a])
+    grouped = juniper[juniper['action'] != 'DENY'].groupby(['date', 'src_address', 'dst_address'])
+    for d, src, dst in grouped.groups.keys():
+        temp_result.append([d, src, dst, len(juniper.iloc[grouped.groups[(d, src, dst)]]), 
+                            np.sum(juniper.iloc[grouped.groups[(d, src, dst)]]).total_size])
     
     return temp_result
