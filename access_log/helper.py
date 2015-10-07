@@ -4,6 +4,8 @@ import pandas as pd
 #import numpy as np
 import gzip
 import tarfile
+import zipfile
+import zlib
 
 def open_gz(filename):
     with gzip.open(filename, 'r') as f:
@@ -37,6 +39,10 @@ def open_csv(filename, chunksize=20000):
     print(str(total_chunksize) + " rows processed.")
     
     return df
+
+def zip_file(output, infile):
+    with zipfile.ZipFile(output, 'w') as zp:
+        zp.write(infile, compress_type=zipfile.ZIP_DEFLATED)
 
 #def remove_duplicate_spaces(word):
 #    #return ''.join(ch for ch, _ in itertools.groupby(word))
