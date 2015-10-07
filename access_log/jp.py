@@ -1,55 +1,65 @@
+import pandas as pd
+import numpy as np
 import helper as hp
 
-def process_juniper_line(line):
-    result = []
-    line = hp.remove_duplicate_spaces(line).split(' ')
-    result.append(line[0] + ' ' + line[1] + ' ' + line[2])
-    result.append(line[3])
-    result.append(line[4] + ' ' + line[5])
-    result.append(line[6])
-    result.append(line[8] + ' ' + line[9])
-    for i in range(10, 13):
-        result.append(line[i])
-    result.append(line[14] + ' ' + line[15])    
-    result.append(line[16] + ' ' + line[17])
-    for i in range(18, 25):
-        result.append(line[i])
-    result.append(line[26] + ' ' + line[27]) 
-    result.append(line[28] + ' ' + line[29]) 
-    for i in range(30, len(line) - 4):
-        result.append(line[i])
-    result.append(line[32] + ' ' + line[33] + ' ' + line[34] + ' ' + line[35])
-    return result
-
-def read_syslog_juniper(filename, filter=None):
-    result = []
+def clean_juniper_file(infile, outfile):
+    with open(infile, 'r') as in_file:
+        with open(outfile, 'w') as out_file:
+            for line in in_file:
+                if ('system-notification-00257(traffic)' in line):                                                
+                    idx_1 = line.find('service=')
+                    idx_2 = line.find(' proto=')
+                    if (idx_1 and idx_2):
+                        out_file.write(line[:idx_1]+line[idx_1:idx_2].replace(' ', '')+line[idx_2:])
+                        
+def open_juniper_log(filename, chunksize=20000):
     
-    if (filename)[-3:] == '.gz':
-        f = hp.open_gz(filename)
-    elif (filename)[-6:] == 'tar.gz':
-        f = hp.open_tar_gz(filename)
+    df = pd.DataFrame()
+    
+    for c in pd.read_table(filename, sep='\s{1,}|"', chunksize=chunksize, iterator=True, engine='python', index_col=False, header=None, parse_dates=[[0, 1, 2], [9,10]]):        
+        df = pd.concat([df, c])        
+        
+    print(str(len(df)) + " rows processed.")
+    
+    return df                        
+
+def juniper_log_cleansing(x):
+    if str(x).find('=') > 0:
+        return str(x)[str(x).find('=')+1:]
+    elif str(x).find(':') > 0:
+        return str(x)[:str(x).find(':')]    
     else:
-        f = hp.open_txt(filename)
-
-    f = f.split('\n')
-
-    # file santization (remove duplicate space characters)
-    for row in f:
-        if row != '':
-            row = row.rstrip('\n')
-            temp = hp.remove_duplicate_spaces(row).split(' ')
-
-            # convert first field back to datetime
-            #temp[0] = convert_ts(temp[0])
-            result.append(temp)
-            
-    f = ''
+        return x
     
-    # convert list into pandas dataframe
-    df = pd.DataFrame(result)
-    # remove blank column
-    #df.drop(df[[7]], axis=1, inplace='TRUE')
-    # rename columns
-    #df.columns = ['time', 'duration', 'client_address', 'result_code', 'bytes', 'method', 'URL', 'hierarchy', 'type']
+def read_syslog_juniper(filename):
+       
+    df = open_juniper_log(filename, 50000)
+    
+    df = df[df[7].str.contains('information') == False]
+    
+    # restructure the dataframe
+    i = [0]
+    i.extend(range(3, 4))
+    i.extend([1])
+    i.extend(range(9, 13))
+    i.extend([14])
+    i.extend([16])
+    i.extend(range(17, 25))
+    df = df.iloc[:, i]
+    
+    df.columns = ['time', 'device_name', 'traffic_start', 'duration', 'policy_no', 'service', 'protocol', 'src_zone', 'dst_zone', 'action', 'sent_size', 'received_size', 'src_address', 'dst_address', 'src_port', 'dst_port', 'remarks']
+    df[['device_name', 'duration', 'policy_no', 'service', 'protocol', 'src_zone', 'dst_zone', 'action', 'sent_size', 'received_size', 'src_address', 'dst_address', 'src_port', 'dst_port']] = df[['device_name', 'duration', 'policy_no', 'service', 'protocol', 'src_zone', 'dst_zone', 'action', 'sent_size', 'received_size', 'src_address', 'dst_address', 'src_port', 'dst_port']].applymap(juniper_log_cleansing)
+    df[['policy_no', 'protocol', 'sent_size', 'received_size', 'src_port', 'dst_port']] = df[['policy_no', 'protocol', 'sent_size', 'received_size', 'src_port', 'dst_port']].convert_objects(convert_numeric = True)
+    
+    df = df.reset_index(drop=True)
     
     return df
+
+def process_group(juniper):
+    temp_result = []
+    grouped = juniper[juniper['action'] != 'DENY'].groupby(['date', 'src_address', 'dst_address'])
+    for d, src, dst in grouped.groups.keys():
+        temp_result.append([d, src, dst, len(juniper.iloc[grouped.groups[(d, src, dst)]]), 
+                            np.sum(juniper.iloc[grouped.groups[(d, src, dst)]]).total_size])
+    
+    return temp_result
