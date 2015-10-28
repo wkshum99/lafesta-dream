@@ -1,16 +1,16 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[15]:
 
 from __future__ import division
 
 
-# In[2]:
+# In[16]:
 
 import csv
 import pandas as pd
-import datetime
+import time
 import string
 import numpy as np
 import helper as hp
@@ -20,53 +20,48 @@ import urllib
 import os
 
 
-# In[3]:
+# In[17]:
 
 from sqlalchemy import create_engine
 
 
-# In[4]:
+# In[18]:
 
 pd.set_option('display.max_columns', None)
 Gb = 1000000000
 
 
-# In[5]:
+# In[19]:
 
 temp_csv = 'v:'+os.sep+'temp'+os.sep+'temp.log'
 
 
-# In[6]:
+# In[20]:
 
 log_dir = 'v:'+os.sep+'temp'+os.sep+'log'+os.sep
 
 
-# In[7]:
+# In[21]:
 
 zip_dir = 'v:'+os.sep+'temp'+os.sep+'a'+os.sep
 
 
-# In[8]:
+# In[22]:
 
 sqlitedb = 'v:\\temp\\access_log.db'
 
 
-# In[9]:
-
-#log_file = 'c:'+os.sep+'temp'+os.sep+'hk-ssg140.log-20150922'
-
-
-# In[10]:
+# In[23]:
 
 disk_engine = create_engine('sqlite:///'+sqlitedb)
 
 
-# In[11]:
+# In[24]:
 
 #store = pd.HDFStore('access_log.h5')
 
 
-# In[12]:
+# In[25]:
 
 #squid = sq.read_squid_log('access.log')
 #squid.tail()
@@ -75,49 +70,77 @@ disk_engine = create_engine('sqlite:///'+sqlitedb)
 #sum(squid.bytes)/Gb
 
 
-# In[15]:
+# In[32]:
 
 def valid_file(file):
-    if (file[-4:] != '.zip' & file[0:9] == 'hk-ssg140'):
+    if (file[-4:] != '.zip' and file[0:9] == 'hk-ssg140'):
         return True
     else:
         return False
 
 
-# In[13]:
+# In[33]:
 
 print('Started at: ' + time.strftime('%Y-%m-%d %H:%M:%S'))
 
-for file in os.listdir(log_dir):
-    if (valid_file(file)):
-        log_file = os.path.join(log_dir, file)
-        jp.clean_juniper_file(log_file, temp_csv)
+mode = 'full'
+if (mode == 'single'):
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    log_file = os.path.join(log_dir, 'hk-ssg140.log-'+yesterday.strftime('%Y%m%d'))
+                                                                         
+    jp.clean_juniper_file(log_file, temp_csv)
     
-        juniper = [] 
-        temp_result = []
+    juniper = [] 
+    temp_result = []
     
-        juniper = jp.read_syslog_juniper(temp_csv)
+    juniper = jp.read_syslog_juniper(temp_csv)
     
-        juniper['date'] = juniper['time'].apply(lambda x: x.strftime('%Y-%m-%d'))
-        juniper['total_size'] = juniper['sent_size'] + juniper['received_size']        
+    juniper['date'] = juniper['time'].apply(lambda x: x.strftime('%Y-%m-%d'))
+    juniper['total_size'] = juniper['sent_size'] + juniper['received_size']        
     
-        temp_result = jp.process_group(juniper)
+    temp_result = jp.process_group(juniper)
     
-        temp_result = pd.DataFrame(temp_result, columns=['date', 'src', 'dst', 'count', 'total_size'])
-        temp_result['location'] = 'HK'
+    temp_result = pd.DataFrame(temp_result, columns=['date', 'src', 'dst', 'count', 'total_size'])
+    temp_result['location'] = 'HK'
     
-        try:
-            temp_result.to_sql('data', disk_engine, index=False, if_exists='append')
-            print (file + ' processed')
-        except:
-            pass
+    try:
+        temp_result.to_sql('data', disk_engine, index=False, if_exists='append')
+        print (log_file + ' processed')
+    except:
+        pass
     
-    #zip = zipfile.ZipFile(zip_dir + file + '.zip', 'w')
-    #zip.write(os.path.join(log_dir, file), compress_type=zipfile.ZIP_DEFLATED)
-    #zip.close()
-        hp.zip_file(zip_dir + file + '.zip', os.path.join(log_dir, file))
+    hp.zip_file(zip_dir + log_file + '.zip', os.path.join(log_dir, log_file))
             
-        os.remove(os.path.join(log_dir, file))
+    os.remove(os.path.join(log_dir, log_file))                                                                         
+                                                                         
+else:    
+    for file in os.listdir(log_dir):
+        if (valid_file(file)):
+            log_file = os.path.join(log_dir, file)
+            jp.clean_juniper_file(log_file, temp_csv)
+    
+            juniper = [] 
+            temp_result = []
+    
+            juniper = jp.read_syslog_juniper(temp_csv)
+    
+            juniper['date'] = juniper['time'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            juniper['total_size'] = juniper['sent_size'] + juniper['received_size']        
+    
+            temp_result = jp.process_group(juniper)
+    
+            temp_result = pd.DataFrame(temp_result, columns=['date', 'src', 'dst', 'count', 'total_size'])
+            temp_result['location'] = 'HK'
+    
+            try:
+                temp_result.to_sql('data', disk_engine, index=False, if_exists='append')
+                print (file + ' processed')
+            except:
+                pass
+    
+            hp.zip_file(zip_dir + file + '.zip', os.path.join(log_dir, file))
+            
+            os.remove(os.path.join(log_dir, file))
               
 os.remove(temp_csv)
 
