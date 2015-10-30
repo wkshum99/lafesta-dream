@@ -1,23 +1,22 @@
 import pandas as pd
 import numpy as np
-import helper as hp
+#import helper as hp
 
 def clean_juniper_file(infile, outfile):
-    with open(infile, 'r') as in_file:
-        with open(outfile, 'w') as out_file:
-            for line in in_file:
+    #with open(infile, 'r') as in_file:
+    with open(outfile, 'w') as out_file:
+            for line in infile.split('\n'):
                 if ('system-notification-00257(traffic)' in line):                                                
                     idx_1 = line.find('service=')
                     idx_2 = line.find(' proto=')
-                    if (idx_1 and idx_2):
-                        out_file.write(line[:idx_1]+line[idx_1:idx_2].replace(' ', '')+line[idx_2:])
-                        
+                    if idx_1 and idx_2:
+                        out_file.write(line[:idx_1]+line[idx_1:idx_2].replace(' ', '')+line[idx_2:]+'\n')
+
 def open_juniper_log(filename, chunksize=20000):
-    
+
     df = pd.DataFrame()
-    
-    for c in pd.read_table(filename, sep='\s{1,}|"', chunksize=chunksize, iterator=True, engine='python', index_col=False, header=None, parse_dates=[[0, 1, 2], [9,10]]):        
-        df = pd.concat([df, c])        
+    for c in pd.read_table(filename, sep='\s{1,}|"', chunksize=chunksize, iterator=True, engine='python', index_col=False, header=None, parse_dates=[[0, 1, 2], [9,10]]):
+        df = pd.concat([df, c])
         
     print(str(len(df)) + " rows processed.")
     
@@ -30,10 +29,9 @@ def juniper_log_cleansing(x):
         return str(x)[:str(x).find(':')]    
     else:
         return x
-    
+
 def read_syslog_juniper(filename):
-       
-    df = open_juniper_log(filename, 50000)
+    df = open_juniper_log(filename, 100000)
     
     df = df[df[7].str.contains('information') == False]
     
@@ -57,9 +55,9 @@ def read_syslog_juniper(filename):
 
 def process_group(juniper):
     temp_result = []
-    grouped = juniper[juniper['action'] != 'DENY'].groupby(['date', 'src_address', 'dst_address'])
-    for d, src, dst in grouped.groups.keys():
-        temp_result.append([d, src, dst, len(juniper.iloc[grouped.groups[(d, src, dst)]]), 
-                            np.sum(juniper.iloc[grouped.groups[(d, src, dst)]]).total_size])
+    grouped = juniper[juniper['action'] != 'DENY'].groupby(['date', 'src_address', 'dst_address', 'dst_zone'])
+    for d, src, dst, dstzone in grouped.groups.keys():
+        temp_result.append([d, src, dst, dstzone, len(juniper.iloc[grouped.groups[(d, src, dst, dstzone)]]),
+                            np.sum(juniper.iloc[grouped.groups[(d, src, dst, dstzone)]]).total_size])
     
     return temp_result

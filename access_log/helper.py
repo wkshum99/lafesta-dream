@@ -12,6 +12,18 @@ def open_gz(filename):
         file = f.read()
 	return file
 
+def open_zip(file):
+    """
+
+    :rtype : object
+    """
+    if zipfile.is_zipfile(file):
+        with zipfile.ZipFile(file, 'r') as f:
+            for i in f.namelist():
+                return f.read(i)
+    else:
+        return False
+
 def open_tar_gz(filename):
     file = []
     with tarfile.open(filename, 'r:gz') as f:
