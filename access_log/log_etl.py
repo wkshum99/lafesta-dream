@@ -6,8 +6,8 @@ import sys
 import os
 import sqlalchemy
 
-log_dir = 'E:'+os.sep+'temp'+os.sep+'log'+os.sep
-sqlitedb = 'E:'+os.sep+'temp'+os.sep+'sg_access_log.db'
+log_dir = 'D:'+os.sep+'temp'+os.sep+'log'+os.sep
+sqlitedb = 'D:'+os.sep+'temp'+os.sep+'sg_access_log.db'
 mode = 'full'
 Gb = 1000000000
 
@@ -35,7 +35,7 @@ def read_log_file(file):
     # and grab only interesting columns
     # input: file
     # output: dataframe
-    df = pd.read_table(file, sep='[a-z]*=', quotechar='"', header=None, engine='python')
+    df = pd.read_table(file, sep='[a-z]*=', quotechar='"', engine='python', header=None, names=range(22))
     #df = df.iloc[:,[2, 3, 7, 8, 9, 10, 11, 12, 13]]
     df = df[pd.isnull(df[2])!=True][[2, 7, 8, 9, 10, 11, 12, 13]]
     df.columns = ['time', 'src_zone', 'dst_zone', 'status', 'sent', 'received', 'src_ip', 'dst_ip']
@@ -70,11 +70,12 @@ def main():
         if file_format == 'zip':
             log_file = hp.open_zip(os.path.join(log_dir, file))
         elif (file_format == 'txt'):
+            print 'start processing: ' + file
             df = read_log_file(os.path.join(log_dir, file))
             grouped = df_groupby(df, ['time', 'src_zone', 'dst_zone', 'src_ip', 'dst_ip'])
             grouped = process_group(grouped)
             grouped = grouped.reset_index()
-            grouped[['time', 'src_zone', 'dst_zone', 'src_ip', 'dst_ip', 'total']].to_sql('data', connect_sqlite(sqlitedb), index=False, if_exists='replace')
+            grouped[['time', 'src_zone', 'dst_zone', 'src_ip', 'dst_ip', 'total']].to_sql('data', connect_sqlite(sqlitedb), index=False, if_exists='append')
             #nrow = read_log_file(os.path.join(log_dir, file))
         else:
             # skip this file if non txt and zip
